@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Forex Board | Real-Time Conversion & News</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons for aesthetic components -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- ADD CHART.JS for Historical Chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom scrollbar for news feed (for dark theme visibility) */
+        #news-feed::-webkit-scrollbar {
+            width: 6px;
+        }
+        #news-feed::-webkit-scrollbar-thumb {
+            background-color: #0d9488; /* Teal-600 */
+            border-radius: 3px;
+        }
+        #news-feed::-webkit-scrollbar-track {
+            background-color: #1f2937; /* Gray-800 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #061422;
+        }
+        /* Custom utility for the background grid effect */
+        
+        .currency-input {
+             -moz-appearance: textfield;
+        }
+        .currency-input::-webkit-outer-spin-button,
+        .currency-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="grid-background min-h-screen text-gray-100 p-4 md:p-8">
+
+    <!-- Global Loading Indicator -->
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900/90 flex items-center justify-center z-50 transition-opacity duration-300">
+        <div class="flex flex-col items-center">
+            <svg class="animate-spin h-10 w-10 text-cyan-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-3 text-cyan-400 font-semibold">Loading Financial Data...</p>
+        </div>
+    </div>
+
+    <!-- Main Header -->
+    <header class="text-center mb-10">
+        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-500 shadow-md">
+            Digital Forex Board
+        </h1>
+        <p class="text-gray-400 mt-2 text-lg">Real-Time Conversion & Global Market News</p>
+    </header>
+
+    <main class="max-w-7xl mx-auto">
+        <div id="api-error-message" class="hidden bg-red-800 border-l-4 border-red-500 text-white p-4 mb-6 rounded-lg shadow-xl" role="alert">
+            <p class="font-bold">API Error</p>
+            <p id="error-text">Failed to fetch data. Please check your API keys and try again later.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- LEFT COLUMN: CONVERTER & CHARTS/RATES -->
+            <section class="lg:col-span-2 space-y-8">
+                <!-- CURRENCY CONVERTER CARD -->
+                <div class="bg-gray-800/70 backdrop-blur-sm p-6 md:p-8 rounded-xl shadow-2xl border border-gray-700">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center text-cyan-300">
+                        <i data-lucide="calculator" class="w-6 h-6 mr-3"></i> Instant Converter
+                    </h2>
+
+                    <!-- Inputs & Swap Button -->
+                    <div class="flex items-center space-x-4 mb-6">
+                        <!-- From Currency Input -->
+                        <div class="flex-1">
+                            <label for="amount-from" class="block text-sm font-medium text-gray-400 mb-1">Amount</label>
+                            <input type="number" id="amount-from" value="1.00" min="0.01" step="0.01" class="currency-input w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-150">
+                        </div>
+                        
+                        <!-- From Currency Selector -->
+                        <div class="flex-1">
+                            <label for="currency-from" class="block text-sm font-medium text-gray-400 mb-1">From</label>
+                            <select id="currency-from" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-150">
+                                <!-- Options populated by JS -->
+                            </select>
+                        </div>
+
+                        <!-- Swap Button -->
+                        <div class="pt-6">
+                            <button id="swap-button" class="p-3 mt-1 bg-teal-600 text-white rounded-full shadow-lg hover:bg-teal-500 transition duration-200 transform hover:scale-105" title="Swap Currencies">
+                                <i data-lucide="arrow-right-left" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+
+                        <!-- To Currency Selector -->
+                        <div class="flex-1">
+                            <label for="currency-to" class="block text-sm font-medium text-gray-400 mb-1">To</label>
+                            <select id="currency-to" class="w-full p-3 rounded-lg bg-gray-700 text-white border border-gray-600 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-150">
+                                <!-- Options populated by JS -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Conversion Result -->
+                    <div class="mt-8 p-4 bg-gray-900 border-l-4 border-cyan-500 rounded-lg shadow-inner">
+                        <p class="text-sm font-medium text-gray-400">Conversion Result:</p>
+                        <p id="conversion-result" class="text-3xl font-bold text-teal-400 mt-1">1.00 USD = ...</p>
+                        <p id="rate-display" class="text-xs text-gray-500 mt-1"></p>
+                    </div>
+                </div>
+
+                <!-- ADDED: HISTORICAL CHART CARD -->
+                <div class="bg-gray-800/70 backdrop-blur-sm p-6 md:p-8 rounded-xl shadow-2xl border border-gray-700">
+                    <h2 id="historic-heading" class="text-2xl font-bold mb-6 flex items-center text-cyan-300">
+                        <i data-lucide="line-chart" class="w-6 h-6 mr-3"></i> Historical Trend (USD/EUR - Last 7 Days)
+                    </h2>
+                    <div class="p-2 bg-gray-900 rounded-lg">
+                        <canvas id="historical-chart" height="150"></canvas>
+                    </div>
+                </div>
+
+                <!-- RESTORED: LIVE RATE BOARD CARD (Main Currencies) -->
+                <div class="bg-gray-800/70 backdrop-blur-sm p-6 md:p-8 rounded-xl shadow-2xl border border-gray-700">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center text-cyan-300">
+                        <i data-lucide="trending-up" class="w-6 h-6 mr-3"></i> Top Live Rates (USD Base)
+                    </h2>
+                    <div id="live-rates-board" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <!-- Live rate cards populated by JS -->
+                        <div class="p-4 bg-gray-700 rounded-lg text-center shadow-lg animate-pulse">
+                            <p class="text-lg font-bold text-gray-500">EUR</p>
+                            <p class="text-xs text-gray-500 mt-1">0.0000</p>
+                        </div>
+                        <div class="p-4 bg-gray-700 rounded-lg text-center shadow-lg animate-pulse">
+                            <p class="text-lg font-bold text-gray-500">GBP</p>
+                            <p class="text-xs text-gray-500 mt-1">0.0000</p>
+                        </div>
+                        <div class="p-4 bg-gray-700 rounded-lg text-center shadow-lg animate-pulse">
+                            <p class="text-lg font-bold text-gray-500">JPY</p>
+                            <p class="text-xs text-gray-500 mt-1">0.0000</p>
+                        </div>
+                        <div class="p-4 bg-gray-700 rounded-lg text-center shadow-lg animate-pulse">
+                            <p class="text-lg font-bold text-gray-500">CAD</p>
+                            <p class="text-xs text-gray-500 mt-1">0.0000</p>
+                        </div>
+                        <div class="p-4 bg-gray-700 rounded-lg text-center shadow-lg animate-pulse">
+                            <p class="text-lg font-bold text-gray-500">AUD</p>
+                            <p class="text-xs text-gray-500 mt-1">0.0000</p>
+                        </div>
+                        <div class="p-4 bg-gray-700 rounded-lg text-center shadow-lg animate-pulse">
+                            <p class="text-lg font-bold text-gray-500">CHF</p>
+                            <p class="text-xs text-gray-500 mt-1">0.0000</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT COLUMN: NEWS FEED -->
+            <section class="lg:col-span-1">
+                <div class="bg-gray-800/70 backdrop-blur-sm p-6 md:p-8 rounded-xl shadow-2xl border border-gray-700">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center text-cyan-300">
+                        <i data-lucide="newspaper" class="w-6 h-6 mr-3"></i> Forex News Feed
+                    </h2>
+                    <div id="news-feed" class="space-y-4 h-[500px] overflow-y-auto">
+                        <!-- News articles populated by JS -->
+                        <div class="p-4 bg-gray-700 rounded-lg animate-pulse h-20"></div>
+                        <div class="p-4 bg-gray-700 rounded-lg animate-pulse h-20"></div>
+                        <div class="p-4 bg-gray-700 rounded-lg animate-pulse h-20"></div>
+                        <div class="p-4 bg-gray-700 rounded-lg animate-pulse h-20"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // --- Configuration ---
+        const EXCHANGE_API_KEY = "75adaa949a79248fe9c6d4f9"; // *** REPLACE WITH YOUR KEY ***
+        const GNEWS_API_KEY = "lgSUYGFZ1PGz3AZCxW58vyHeuC1jQ02wT7sqFfGE"; // *** REPLACE WITH YOUR KEY ***
+        const EXCHANGE_URL_BASE = `https://v6.exchangerate-api.com/v6/${EXCHANGE_API_KEY}/latest/USD`;
+const MARKET_AUX_URL = `https://api.allorigins.win/raw?url=${encodeURIComponent(
+  "https://api.marketaux.com/v1/news/all?filter[category]=forex&language=en&limit=5&api_token=lgSUYGFZ1PGz3AZCxW58vyHeuC1jQ02wT7sqFfGE"
+)}`;        
+        const RETRY_LIMIT = 5;
+        // Re-instate KEY_RATES for the card layout
+        const KEY_RATES = ["EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR"]; 
+
+        // --- State ---
+        let conversionRates = {};
+        let currencyCodes = [];
+        let historicalChart = null; // To hold the chart instance
+
+        // --- DOM Elements ---
+        const $fromAmount = document.getElementById('amount-from');
+        const $fromCurrency = document.getElementById('currency-from');
+        const $toCurrency = document.getElementById('currency-to');
+        const $swapButton = document.getElementById('swap-button');
+        const $result = document.getElementById('conversion-result');
+        const $rateDisplay = document.getElementById('rate-display');
+        const $liveRatesBoard = document.getElementById('live-rates-board'); // Target for cards
+        const $newsFeed = document.getElementById('news-feed');
+        const $loadingOverlay = document.getElementById('loading-overlay');
+        const $errorMsg = document.getElementById('api-error-message');
+        const $errorText = document.getElementById('error-text');
+        // Removed table-related DOM elements
+
+        // --- Utility Functions ---
+
+        /** Shows or hides the loading overlay. */
+        function toggleLoading(show) {
+            $loadingOverlay.style.opacity = show ? '1' : '0';
+            $loadingOverlay.style.pointerEvents = show ? 'auto' : 'none';
+        }
+
+        /** Displays an error message to the user. */
+        function displayError(message) {
+            $errorText.textContent = message;
+            $errorMsg.classList.remove('hidden');
+        }
+
+        /** Exponential backoff retry handler for fetch. */
+        async function fetchWithRetry(url, options = {}, retries = RETRY_LIMIT) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        // Check for 404/403 errors typically caused by invalid keys
+                        if (response.status === 404 || response.status === 403) {
+                             throw new Error(`API returned status ${response.status}. Check if your API key is valid.`);
+                        }
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                } catch (error) {
+                    if (i === retries - 1) {
+                        console.error('Fetch failed after multiple retries:', url, error);
+                        throw error;
+                    }
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        /** Populates currency dropdowns with available codes. */
+        function populateCurrencies() {
+            if (currencyCodes.length === 0) {
+                // Fallback list if API fails to provide one
+                currencyCodes = Object.keys(conversionRates).length > 0
+                    ? Object.keys(conversionRates).sort()
+                    : ["USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR", "ZAR", "BRL"];
+            }
+
+            const fragment = document.createDocumentFragment();
+            currencyCodes.forEach(code => {
+                const option = document.createElement('option');
+                option.value = code;
+                option.textContent = code;
+                fragment.appendChild(option);
+            });
+
+            // Clear existing options and append new ones
+            $fromCurrency.innerHTML = '';
+            $toCurrency.innerHTML = '';
+            $fromCurrency.appendChild(fragment.cloneNode(true));
+            $toCurrency.appendChild(fragment.cloneNode(true));
+
+            // Set default selections
+            $fromCurrency.value = 'USD';
+            $toCurrency.value = 'EUR';
+
+            // Run initial conversion
+            convertCurrency();
+        }
+
+        // --- Main Logic Functions ---
+
+        /** * Fetches currency rates and initializes the converter. 
+         * Uses USD as the base for simplicity and wide coverage.
+         */
+        async function fetchRates() {
+            // Check for unreplaced placeholder/URL in the key
+            if (EXCHANGE_API_KEY.includes("YOUR_") || EXCHANGE_API_KEY.includes("http")) {
+                displayError("Please replace 'YOUR_EXCHANGE_RATE_API_KEY' with your actual key to fetch live rates.");
+                return;
+            }
+
+            try {
+                const data = await fetchWithRetry(EXCHANGE_URL_BASE);
+
+                if (data.result === 'success') {
+                    conversionRates = data.conversion_rates;
+                    currencyCodes = Object.keys(conversionRates).sort();
+                    populateCurrencies();
+                    renderLiveRates(); // Render the cards
+                } else {
+                    displayError(`Exchange Rate API failed: ${data['error-type'] || 'Unknown error'}`);
+                }
+            } catch (error) {
+                displayError(`Failed to connect to the Exchange Rate API. (${error.message})`);
+                console.error("Exchange Rate API fetch error:", error);
+            }
+        }
+
+        /** Performs the currency conversion calculation and updates the UI. */
+        function convertCurrency() {
+            const amount = parseFloat($fromAmount.value);
+            const fromCode = $fromCurrency.value;
+            const toCode = $toCurrency.value;
+
+            if (isNaN(amount) || amount <= 0 || !conversionRates[fromCode] || !conversionRates[toCode]) {
+                $result.textContent = "Enter a valid amount.";
+                $rateDisplay.textContent = "";
+                return;
+            }
+
+            // Rate calculation: (To_Rate / From_Rate)
+            // Rates are relative to the base currency (USD in this setup)
+            const rate = conversionRates[toCode] / conversionRates[fromCode];
+            const resultAmount = amount * rate;
+
+            $result.textContent = `${amount.toFixed(2)} ${fromCode} = ${resultAmount.toFixed(4)} ${toCode}`;
+            $rateDisplay.textContent = `1 ${fromCode} = ${rate.toFixed(6)} ${toCode}`;
+            renderHistoricalChart(fromCode, toCode);
+
+        }
+        
+        /** Renders a historical rate chart using mock data. */
+    /** Renders a historical rate chart dynamically based on selected currencies. */
+function renderHistoricalChart(baseCurrency, targetCurrency) {
+    document.getElementById("historic-heading").textContent =
+  `Historical Trend (${baseCurrency}/${targetCurrency} - Last 7 Days)`;
+
+    const ctx = document.getElementById('historical-chart').getContext('2d');
+    
+    // Get current rate from conversionRates (fallback to mock value)
+    const currentRate = conversionRates[targetCurrency] / conversionRates[baseCurrency] || 1;
+
+    // Generate mock trend around current rate for the last 7 days
+    const dates = ['Day -6', 'Day -5', 'Day -4', 'Day -3', 'Day -2', 'Yesterday', 'Today'];
+    const mockRates = Array.from({ length: 7 }, (_, i) =>
+        currentRate * (1 + (Math.random() - 0.5) * 0.02) // ±2% random variation
+    );
+
+    // Destroy previous chart instance if it exists
+    if (historicalChart) {
+        historicalChart.destroy();
+    }
+
+    historicalChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: `${baseCurrency}/${targetCurrency} Exchange Rate`,
+                data: mockRates,
+                borderColor: '#22d3ee',
+                backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: 4,
+                pointBackgroundColor: '#06b6d4',
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#9ca3af' } },
+                tooltip: { mode: 'index', intersect: false }
+            },
+            scales: {
+                x: {
+                    grid: { color: '#374151' },
+                    ticks: { color: '#9ca3af' }
+                },
+                y: {
+                    beginAtZero: false,
+                    grid: { color: '#374151' },
+                    ticks: {
+                        color: '#9ca3af',
+                        callback: value => value.toFixed(4)
+                    }
+                }
+            }
+        }
+    });
+}
+
+        /** Renders the top live rates in the board (Original Card Logic). */
+        function renderLiveRates() {
+            $liveRatesBoard.innerHTML = ''; // Clear placeholders
+
+            KEY_RATES.forEach(code => {
+                const rateToBase = conversionRates[code]; // Rate to USD
+                
+                // Calculate USD to this currency rate (1 / rateToBase)
+                const rateFromBase = 1 / rateToBase; 
+                
+                if (conversionRates[code] && code !== "USD") {
+                    const rateDisplay = rateFromBase.toFixed(4);
+
+                    const div = document.createElement('div');
+                    div.className = 'p-4 bg-gray-700/80 rounded-xl shadow-lg border border-teal-800 hover:bg-gray-700 transition duration-150 transform hover:scale-[1.02]';
+                    div.innerHTML = `
+                        <p class="text-xl font-extrabold text-cyan-400">${code}</p>
+                        <p class="text-xs text-gray-400 mt-1">1 USD = </p>
+                        <p class="text-lg font-bold text-green-400">${rateDisplay}</p>
+                    `;
+                    $liveRatesBoard.appendChild(div);
+                }
+            });
+            // Ensure Lucide icons are re-rendered
+            lucide.createIcons(); 
+        }
+
+        /** Fetches and displays Forex news. */
+        /** Fetches and displays Forex news (MarketAux API). */
+async function fetchNews() {
+    try {
+        // Fetch the news once
+        const data = await fetchWithRetry(MARKET_AUX_URL);
+
+        // MarketAux uses 'data' not 'articles'
+        const articles = data.data || [];
+
+        if (articles.length > 0) {
+            // Convert MarketAux structure to match renderNews()
+            const formatted = articles.map(item => ({
+                title: item.title,
+                description: item.description || item.snippet || "No description available.",
+                url: item.url,
+                source: { name: item.source || "MarketAux" }
+            }));
+            renderNews(formatted);
+        } else {
+            renderNews([]);
+            console.warn("MarketAux API returned no articles or unexpected structure:", data);
+        }
+
+    } catch (error) {
+        const errorItem = {
+            title: "News Service Unavailable",
+            description: `Failed to fetch news. Check API key or network connection.`,
+            source: { name: "System" },
+            url: "#"
+        };
+        renderNews([errorItem]);
+        console.error("MarketAux API fetch error:", error);
+    }
+}
+
+
+
+        /** Renders the news articles into the feed. */
+        function renderNews(articles) {
+            $newsFeed.innerHTML = ''; // Clear placeholders
+            if (articles.length === 0) {
+                $newsFeed.innerHTML = '<p class="text-gray-500 p-4 text-center">No recent forex news available.</p>';
+                return;
+            }
+
+            articles.forEach(article => {
+                const articleDiv = document.createElement('a');
+                articleDiv.href = article.url || '#';
+                articleDiv.target = "_blank";
+                articleDiv.className = 'block p-4 bg-gray-700 hover:bg-gray-600 rounded-lg transition duration-200 border-l-4 border-teal-500 shadow-md';
+                articleDiv.innerHTML = `
+                    <p class="text-md font-semibold text-white">${article.title || 'No Title'}</p>
+                    <p class="text-sm text-gray-400 mt-1 line-clamp-2">${article.description || 'No description available.'}</p>
+                    <p class="text-xs text-cyan-500 mt-2 font-mono">${article.source?.name || 'Unknown Source'}</p>
+                `;
+                $newsFeed.appendChild(articleDiv);
+            });
+        }
+
+        /** Swaps the selected 'From' and 'To' currencies. */
+        function swapCurrencies() {
+            const fromValue = $fromCurrency.value;
+            const toValue = $toCurrency.value;
+            $fromCurrency.value = toValue;
+            $toCurrency.value = fromValue;
+            convertCurrency();
+        }
+
+        // --- Event Listeners and Initialization ---
+
+        window.onload = async function() {
+            toggleLoading(true);
+            
+            // 1. Fetch Currency Data
+            await fetchRates();
+
+            // 1.5. Render Historical Chart (after rates are fetched)
+            renderHistoricalChart('USD', 'EUR');
+
+            // 2. Fetch News Data
+            await fetchNews();
+
+            toggleLoading(false);
+        };
+        
+        // Add event listeners for interaction
+        $fromAmount.addEventListener('input', convertCurrency);
+        $fromCurrency.addEventListener('change', convertCurrency);
+        $toCurrency.addEventListener('change', convertCurrency);
+        $swapButton.addEventListener('click', swapCurrencies);
+        
+        // Removed table sorting listeners
+    </script>
+</body>
+</html>
